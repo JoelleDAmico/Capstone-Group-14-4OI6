@@ -13,17 +13,14 @@ Setup (Variables, etc.) DONE!!!
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
 CHARACTERISTIC_UUID = "12345678-1234-5678-1234-56789abcdef1"
 
-# State variables
+# Variables
 current_state = "IDLE"  # States: IDLE, RECEIVING, SENDING, INTERRUPT, PAUSED
 received_payload = []      # Buffer to store received recipe steps
 instruction_payload = ""   # Data to be sent to central
 ack_received = False       # Flag for ACK status
-# ack_lock = threading.Lock()  # Lock to synchronize ACK handling
-heartbeat_active = True    # Flag to enable/disable heartbeats
 interrupt_active = False   # Flag to indicate an active interrupt
 interrupt_code = ""
 
-# Header dictionary for readability
 HEADERS = {
     "SYN": 0x10,
     "ACK": 0x01,
@@ -52,18 +49,14 @@ def format_message(header, payload):
     payload_bytes = payload.ljust(28, b'\x00')[:28]  # Pad or truncate payload to 28 bytes
     return header_bytes + payload_bytes
 
-# Function to parse received packets
 def parse_message(packet):
     header = packet[0]
     payload = packet[4:].rstrip(b'\x00')
     return header, payload
 
-# Function to handle acknowledgements
 def send_ack(msg_type):
     global ack_received
     ack_packet = format_message(header=HEADERS["ACK"], payload=msg_type.to_bytes(1, 'big'))
-    # with ack_lock:
-        # ack_received = True
     return ack_packet
 
 
@@ -73,7 +66,6 @@ Peripheral-Initiated Steps (Indicators)
 
 """""
 
-# Modify send_indication to include state checks for retries
 def send_indication(data):
     global ble_peripheral
     characteristic = ble_peripheral.find_characteristic(CHARACTERISTIC_UUID)
@@ -90,17 +82,16 @@ def send_data():
     sequence = 0  # Sequence number for the packets
 
     while data:
-        # Slice the first `chunk_size` bytes and remove from `data`
+        
         chunk, data = data[:chunk_size], data[chunk_size:]
 
-        # Format the message with the DATA header and sequence number
         message = format_message(header=HEADERS["DATA"], payload=chunk)
 
         # Send the message as an indication
         send_indication(message)
         print(f"Sent chunk {sequence}: {chunk.decode('utf-8')}")
         sequence += 1
-        time.sleep(0.1)  # Optional: Add delay to manage timing
+        time.sleep(0.1)
 
     # Send the FIN header to indicate the end of the transmission
     fin_message = format_message(header=HEADERS["FIN"], payload=b"")
@@ -115,7 +106,6 @@ Central-Initiated Steps (Write_callback) DONE!!!!
 
 """""
 
-# Callback when characteristic is written
 def write_callback(value):
     global current_state, received_payload, ack_received, instruction_payload, interrupt_active
 
@@ -172,7 +162,6 @@ Heartbeats (Read_callbacks) DONE!!
 
 """""
 
-# Callback when characteristic is read
 def read_callback():
     return send_ack(HEADERS["HEARTBEAT"])
 
@@ -183,15 +172,16 @@ Interrupt Thread (Indicators) DONE!!!
 
 """""
 
-# Function to handle interrupt logic
 def handle_interrupt():
-    global current_state, interrupt_code
+    global current_state, interrupt_code, interrupt_active
 
-    interrupt_packet = format_message(header=HEADERS["INTR"], payload=DANGER_CODES[interrupt_code])
-    send_indication(interrupt_packet)
-    current_state = "PAUSED"
-
-    return
+    while True:
+        if current_state == "INTERRUPT" and interrupt_active:
+            interrupt_packet = format_message(header=HEADERS["INTR"], payload=DANGER_CODES[interrupt_code])
+            send_indication(interrupt_packet)
+            current_state = "PAUSED"
+            
+        return
 
 
 """"" 
@@ -200,13 +190,11 @@ BLE Service Publishing DONE!!!
 
 """""
 
-# Create the BLE peripheral
 ble_peripheral = peripheral.Peripheral(
     adapter_address="2C:CF:67:77:45:BF",
     local_name="AIpron",
 )
 
-# Add the custom service and characteristic
 ble_peripheral.add_service(srv_id=1, uuid=SERVICE_UUID, primary=True)
 ble_peripheral.add_characteristic(
     srv_id=1,
@@ -224,19 +212,15 @@ print("Starting BLE advertising...")
 ble_peripheral.publish()
 print("BLE peripheral running. Waiting for connection...")
 
-# Start the heartbeat in a separate thread
+# Start the interrupt in a separate thread
 interrupt_thread = threading.Thread(target=handle_interrupt, daemon=True)
 interrupt_thread.start()
 
-# Main loop
 try:
     while True:
         time.sleep(1)
 
-        if current_state == "INTERRUPT" and interrupt_active:
-            handle_interrupt()
-
-        elif current_state == "SENDING":
+        if current_state == "SENDING":
 
             if not ack_received:
                 syn_message = format_message(header=HEADERS["SYN"], payload=b"")
