@@ -10,4 +10,4 @@ ADD main.py .
 # urllib is built-in so you don't have to install it here
 RUN pip install requests httpx recipe_scrapers 
 
-CMD [ "python", "./main.py" ]
+CMD [ "python", "./recipe_lib_test.py" ]
