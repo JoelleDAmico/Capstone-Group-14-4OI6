@@ -3,11 +3,13 @@
 # Image: Template for running Containers
 # Container: the actual running process with the package project
 
-FROM python:3.12
+FROM public.ecr.aws/lambda/python:3.12
 
-ADD main.py .
+COPY requirements.txt ${LAMBDA_TASK_ROOT}
 
 # urllib is built-in so you don't have to install it here
-RUN pip install requests httpx recipe_scrapers 
+RUN pip install -r requirements.txt
 
-CMD [ "python", "./recipe_lib_test.py" ]
+COPY main.py ${LAMBDA_TASK_ROOT}
+# Set the command to handler
+CMD [ "main.handler" ]
