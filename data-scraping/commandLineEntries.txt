@@ -1,0 +1,10 @@
+Follow these steps to upload latest docker image created on your machine into AWS:
+(Already completed - included on github for documentation purposes)
+
+Note - In order for these commands to work in Windows Command Prompt - Must be logged in to your respective AWS account configurations
+
+1) aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 976193265077.dkr.ecr.us-east-2.amazonaws.com
+2) docker tag capstone-recipe-parse-function:latest 976193265077.dkr.ecr.us-east-2.amazonaws.com/capstone-recipe-parse-function:latest
+3) docker push 976193265077.dkr.ecr.us-east-2.amazonaws.com/capstone-recipe-parse-function:latest
+
+Reference: https://docs.aws.amazon.com/lambda/latest/dg/images-create.html 
