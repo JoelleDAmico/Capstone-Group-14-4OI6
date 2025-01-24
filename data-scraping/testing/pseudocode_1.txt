@@ -1,0 +1,12 @@
+
+while docker container running(
+  // curr_link is the link provided by iphone (sent to a reachable database)
+  if (curr_link != prev_link)
+    < run data scraping algorithm and produce output >
+    set prev_link = curr_link
+  else() // do nothing
+)
+
+// Database noted on line 3 is going to be MySQL or postgres database
+// iOS --> PHP --> AWS (MYSQL) 
+// https://codewithchris.com/iphone-app-connect-to-mysql-database/#:~:text=Swift%20and%20Xcode!-,If%20you're%20used%20to%20working%20on%20websites%20and%20web,manage%20the%20transactions%20between%20them.
