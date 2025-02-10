@@ -7,4 +7,6 @@ Note - In order for these commands to work in Windows Command Prompt - Must be l
 2) docker tag capstone-recipe-parse-function:latest 976193265077.dkr.ecr.us-east-2.amazonaws.com/capstone-recipe-parse-function:latest
 3) docker push 976193265077.dkr.ecr.us-east-2.amazonaws.com/capstone-recipe-parse-function:latest
 
+Then create Lambda function using image link from ECR
+
 Reference: https://docs.aws.amazon.com/lambda/latest/dg/images-create.html 
