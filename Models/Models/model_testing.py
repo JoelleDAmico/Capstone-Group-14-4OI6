@@ -4,7 +4,7 @@ import cv2
 
 # Load a custom model trained on ingredients (e.g., vegetables, fruits, herbs, meats)
 # Replace 'custom_model_path' with the path to your trained model
-model = torch.hub.load('yolov5', 'custom', path='onion_cook.pt', source='local')
+model = torch.hub.load('yolov5', 'custom', path='knife_safety.pt', source='local')
 model.conf = 0.08
 model.eval()
 

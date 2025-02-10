@@ -35,6 +35,22 @@ def run_ml_model(model_type):
             # Perform detection
             results = model(rgb_frame)
 
+            if model_type == "onion_cook":
+                model2 = torch.hub.load('yolov5', 'custom', path="fire.pt", source='local', verbose = False)
+                model2.conf = 0.08
+                model2.eval()
+                results2 = model2(rgb_frame)
+            
+            if model_type == "knife_safety":
+                model2 = torch.hub.load('yolov5', 'custom', path="bloodstain.pt", source='local', verbose = False)
+                model2.conf = 0.08
+                model2.eval()
+                results2 = model2(rgb_frame)
+                model3 = torch.hub.load('yolov5', 'custom', path="lacerations.pt", source='local', verbose = False)
+                model3.conf = 0.08
+                model3.eval()
+                results3 = model3(rgb_frame)
+
             # Draw bounding boxes and labels on the original frame
             for det in results.xyxy[0]:  # each detection
                 x1, y1, x2, y2, conf, cls = det  # Unpack detection values
@@ -68,6 +84,7 @@ def run_ml_model(model_type):
 
                 
                 if model_type == 'onion_cook':
+
                     if class_name == previous_class and confidence > 0.15:
                         frame_count+=1 
                     else:
