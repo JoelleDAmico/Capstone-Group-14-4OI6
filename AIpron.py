@@ -6,11 +6,14 @@ import torch
 import cv2
 import warnings
 import copy
+import pathlib
+
+pathlib.WindowsPath = pathlib.PosixPath
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Variables
-current_state = "IDLE"  # States: IDLE, RECEIVING, SENDING, INTERRUPT, PAUSED, NEXT
+current_state = "IDLE"  # States: IDLE, RECEIVING, SENDING, INTERRUPT, PAUSED, NEXT, RESET
 previous_state = "" # used when returning to pre-interrupt state (and possibly to track debug flow)
 received_payload = []
 instruction_payload = ""
@@ -18,7 +21,6 @@ interrupt_code = 0
 interrupt_active = False
 ldata_to_send = False
 send_next = False
-next_counter = 0
 step_index = 0
 recipe_ready = False
 current_result = ""
@@ -74,10 +76,11 @@ def parse_message(message):
 # function to handle received messages (incoming)
 async def process_incoming(websocket):
 
-    global current_state, received_payload, instruction_payload, previous_state, interrupt_code, next_counter, step_index, recipe_ready, current_result
+    global current_state, received_payload, instruction_payload, previous_state, interrupt_code, step_index, recipe_ready, current_result, send_next, interrupt_active, ldata_to_send, desired_result
     
     async for message in websocket:
             print(message)
+            print(current_state)
                 
             header, payload, sequence = parse_message(message)
 
@@ -85,7 +88,7 @@ async def process_incoming(websocket):
                 print("Client initiating data transfer.")
                 previous_state = current_state
                 current_state = "RECEIVING"
-                await websocket.send(format_message(HEADERS["ACK"], "SYN"))
+                await websocket.send(format_message(HEADERS["ACK"], HEADERS["SYN"]))
 
             elif current_state == "RECEIVING":
                 if header == HEADERS["FIN"]:
@@ -94,60 +97,61 @@ async def process_incoming(websocket):
                     previous_state = current_state
                     print(received_payload)
                     current_state = "IDLE"
-                    await websocket.send(format_message(HEADERS["ACK"], "FIN"))
+                    await websocket.send(format_message(HEADERS["ACK"], HEADERS["FIN"]))
                 else:
                     received_payload.append(payload)
                     print(f"Received chunk {sequence}: {payload}")
                     await websocket.send(format_message(HEADERS["ACK"], sequence))
 
             elif current_state == "PAUSED":
-                if header == HEADERS["PASS"] and payload == interrupt_code:
+                if header == HEADERS["PASS"]:
                     print("Pass message received from client. Resuming operation.")
                     current_state = previous_state
-                    await websocket.send(format_message(HEADERS["ACK"], "PASS"))
+                    await websocket.send(format_message(HEADERS["ACK"], HEADERS["PASS"]))
 
             elif header == HEADERS["RST"]:
                 print("Resetting to idle state.")
                 previous_state = current_state
-                current_state = "IDLE"  # States: IDLE, RECEIVING, SENDING, INTERRUPT, PAUSED
-                received_payload = []
-                instruction_payload = ""
-                interrupt_code = 0
-                next_counter = 0
-                step_index = 0
                 recipe_ready = False
-                await websocket.send(format_message(HEADERS["ACK"], "RESET"))
+                step_index = 0
+                received_payload = []
+                send_next = False
+                interrupt_active = False
+                ldata_to_send = False
+                interrupt_code = 0
+                current_result = ""
+                desired_result = ""
+                current_state = "IDLE"
+                instruction_payload = ""
+                await websocket.send(format_message(HEADERS["ACK"], HEADERS["RESET"]))
 
             elif header == HEADERS["HEARTBEAT"]:
                 print("Heartbeat received.")
-                await websocket.send(format_message(HEADERS["ACK"], "HEARTBEAT"))
+                await websocket.send(format_chopped_message(HEADERS["ACK"], current_state, HEADERS["HEARTBEAT"]))
 
             elif header == HEADERS["NEXT"]:
-                if(payload == "NO"):
-                    next_counter += 1
-                    previous_state = current_state
-                    current_state = "IDLE"
-                else:
-                    next_counter += 1
-                    decider = run_diagnostic()
-
-                    if(decider == False and next_counter < 2):
-                        await websocket.send(format_message(HEADERS["NEXT"], current_result))
-                    elif(decider == True or next_counter == 2):
-                        next_counter = 0
-                        await websocket.send(format_message(HEADERS["ACK"], HEADERS["NEXT"]))
-                        step_index = payload
-                        previous_state = current_state
-                        current_state = "IDLE"
-
-            elif header == HEADERS["ACK"] and payload == HEADERS["NEXT"]:
-                step_index+=1
+                await websocket.send(format_message(HEADERS["ACK"], HEADERS["NEXT"]))
+                step_index = int(payload)
+                print(f"User-Initiated Next, moving to step: {step_index}")
                 previous_state = current_state
                 current_state = "IDLE"
 
+            elif current_state == "NEXT":
+                if (header == HEADERS["ACK"]) and (payload == HEADERS["NEXT"]):
+                    step_index+=1
+                    print(f"ML-Initiated Next, moving to step: {str(step_index)}")
+                    previous_state = current_state
+                    current_state = "IDLE"
+
             elif header == HEADERS["PRV"]:
-                step_index = payload
+                step_index = int(payload)
+                print(f"Returned to step: {step_index}")
                 await websocket.send(format_message(HEADERS["ACK"], HEADERS["PRV"]))
+
+            elif current_state == "INTERRUPT":
+                if header == HEADERS["ACK"] and payload == HEADERS["INTR"]:
+                    print(f"ACK received! Waiting for pass...")
+                    current_state = "PAUSED"
 
             else:
                 print(f"Unexpected message: {message}")
@@ -166,43 +170,30 @@ async def process_sending(websocket):
     while 1:
         await send_event.wait()
         send_event.clear()
-        with lock:
-                try:
-                    if current_state == "INTERRUPT":
-                        interrupt_message = format_message(HEADERS["INTR"], interrupt_code)
-                        while 1:
-                            await websocket.send(interrupt_message)
-                            print(f"Sent interrupt: {DANGER_CODES[interrupt_code]}")
-                            try:
-                                ack = await asyncio.wait_for(websocket.recv(), timeout=2.0)
-                                header, payload, _ = parse_message(ack)
-                                if header == HEADERS["ACK"] and payload == HEADERS["INTR"]:
-                                    print(f"ACK received! Waiting for pass...")
-                                    current_state = "PAUSED"
-                                    break
+        try:
+            print(f"\nCurrent State: {current_state}\n")
+            if current_state == "INTERRUPT":
+                interrupt_message = format_message(HEADERS["INTR"], interrupt_code)
+                await websocket.send(interrupt_message)
 
-                            except asyncio.TimeoutError:
-                                print(f"ACK timeout. Resending Interrupt Signal...")
+            elif current_state == "SENDING":
+                syn_message = format_message(HEADERS["SYN"])
+                await websocket.send(syn_message)
+                print(f"Trying to start data transfer...")
+                ack_received = await websocket.recv()
+                header, payload, _ = parse_message(ack_received)
 
-                    elif current_state == "SENDING":
-                        syn_message = format_message(HEADERS["SYN"])
-                        await websocket.send(syn_message)
-                        print(f"Trying to start data transfer...")
-                        ack_received = await websocket.recv()
-                        header, payload, _ = parse_message(ack_received)
+                if header == HEADERS["ACK"] and payload == HEADERS["SYN"]:
+                    print(f"ACK received! Starting data transfer...")
+                    await send_data(websocket)
 
-                        if header == HEADERS["ACK"] and payload == HEADERS["SYN"]:
-                            print(f"ACK received! Starting data transfer...")
-                            await send_data(websocket)
+            elif current_state == "NEXT":
+                next_message = format_message(HEADERS["NEXT"], current_result)
+                await websocket.send(next_message)
+                print(f"Sent next message...")
 
-                    elif current_state == "NEXT":
-                        next_message = format_message(HEADERS["NEXT"], current_result)
-                        await websocket.send(next_message)
-                        print(f"Sent next message...")
-                        time.sleep(10)
-
-                except Exception as e:
-                    print(f"Error sending: {e}")
+        except Exception as e:
+            print(f"Error sending: {e}")
            
 # WebSocket handler
 async def websocket_handler(websocket):
@@ -263,30 +254,30 @@ def send_cases(loop):
     global current_state, received_payload, instruction_payload, previous_state, interrupt_code, interrupt_active, ldata_to_send, send_next
 
     while True:
-        with lock:
-            if (interrupt_active):
-                previous_state = current_state
-                current_state = "INTERRUPT"
-                interrupt_active = False
-                asyncio.run_coroutine_threadsafe(set_send(), loop)
+        if (interrupt_active):
+            previous_state = current_state
+            current_state = "INTERRUPT"
+            interrupt_active = False
+            print("Interrupt Active!")
+            asyncio.run_coroutine_threadsafe(set_send(), loop)
 
 
-            elif (ldata_to_send):
-                instruction_payload = "Quando autem elevatum est cor eius, et spiritus illius obfirmatus est ad superbiam, depositus est de solio regni sui, et gloria eius ablata est et a filiis hominum eiectus est, sed et cor eius cum bestiis positum est, et cum onagris erat habitatio eius: foenum quoque ut bos comedebat, et rore caeli corpus eius infectum est, donec cognosceret quod potestatem haberet Altissimus in regno hominum: et quemcumque voluerit, suscitabit super illud."  # Data to be sent to central
-                current_state = "SENDING"
-                ldata_to_send = False
-                asyncio.run_coroutine_threadsafe(set_send(), loop)
+        elif (ldata_to_send):
+            instruction_payload = "Quando autem elevatum est cor eius, et spiritus illius obfirmatus est ad superbiam, depositus est de solio regni sui, et gloria eius ablata est et a filiis hominum eiectus est, sed et cor eius cum bestiis positum est, et cum onagris erat habitatio eius: foenum quoque ut bos comedebat, et rore caeli corpus eius infectum est, donec cognosceret quod potestatem haberet Altissimus in regno hominum: et quemcumque voluerit, suscitabit super illud."  # Data to be sent to central
+            current_state = "SENDING"
+            ldata_to_send = False
+            asyncio.run_coroutine_threadsafe(set_send(), loop)
 
 
-            elif (send_next):
-                current_state = "NEXT"
-                send_next = False
-                asyncio.run_coroutine_threadsafe(set_send(), loop)
-            
-            else:
-                pass
+        elif (send_next):
+            current_state = "NEXT"
+            send_next = False
+            asyncio.run_coroutine_threadsafe(set_send(), loop)
+        
+        else:
+            pass
 
-            time.sleep(0.5)
+        time.sleep(0.5)
 
 def keyword_checker(sentence: str):
     """
@@ -305,7 +296,7 @@ def keyword_checker(sentence: str):
         if word in sentence.lower():  # Case insensitive match
             return value
     
-    return 0  # Return 0 if no keyword is found
+    return ""  # Return 0 if no keyword is found
 
 # Start WebSocket server
 async def start_server():
@@ -324,25 +315,21 @@ async def start_server():
 # Machine Learning Detection
 def ML_func():
 
-    global step_index, desired_result, current_result, current_state, recipe_ready
+    global step_index, desired_result, current_result, current_state, recipe_ready, received_payload
 
-    while True:
-        if(recipe_ready):
-            with lock:
-                print(int(step_index))
-                print(received_payload[int(step_index)])
-                desired_result = keyword_checker(received_payload[int(step_index)])
-                print(desired_result)
+    while (current_state != "NEXT"):
+        if((recipe_ready) and (received_payload != [])):
+            desired_result = keyword_checker(received_payload[int(step_index)])
 
-                if desired_result == "finely_dice" or desired_result == "roughly_slice" or desired_result == "slice": # onion cutting instruction
-                    model_type = "knife_safety"
-                    run_ml_model(model_type)
-                    print("Checking onion cut...")
-                    model_type = "onion_cut"
-                    run_ml_model(model_type)
-                else:
-                    model_type = "onion_cook"
-                    run_ml_model(model_type)
+            if desired_result == "finely_dice" or desired_result == "roughly_slice" or desired_result == "slice": # onion cutting instruction
+                print("Checking onion cut...")
+                model_type = "onion_cut"
+                run_ml_model(model_type)
+            elif desired_result == "":
+                pass
+            else:
+                model_type = "onion_cook"
+                run_ml_model(model_type)
 
 def run_ml_model(model_type):
     '''
@@ -354,7 +341,10 @@ def run_ml_model(model_type):
     }
     '''
 
-    global current_result, interrupt_active, interrupt_code, step_index, current_state, previous_state
+    global current_result, interrupt_active, interrupt_code, step_index, current_state, previous_state, send_next, received_payload
+
+    print(f"Step Index: {int(step_index)}")
+    print(f"Current Step: {received_payload[int(step_index)]}")
 
     # conf_required = 0.08
     path = model_type + '.pt'
@@ -365,9 +355,10 @@ def run_ml_model(model_type):
     extra_models = {}
     if model_type == "onion_cook":
         extra_models["fire"] = torch.hub.load('yolov5', 'custom', path="fire.pt", source='local', verbose=False)
-    elif model_type == "knife_safety":
+    elif model_type == "onion_cut":
         extra_models["bloodstain"] = torch.hub.load('yolov5', 'custom', path="bloodstain.pt", source='local', verbose=False)
         extra_models["lacerations"] = torch.hub.load('yolov5', 'custom', path="lacerations.pt", source='local', verbose=False)
+        extra_models["knife_safety"] = torch.hub.load('yolov5', 'custom', path="knife_safety.pt", source='local', verbose=False)
     
     for key in extra_models:
         extra_models[key].conf = 0.60
@@ -381,21 +372,18 @@ def run_ml_model(model_type):
     frame_count = 0
     previous_class = None
 
-    interrupt_active = False
-    interrupt_code = None
-    current_result = None
-    
     current_step = copy.deepcopy(step_index)
     
     try:
-        while True:
-            # globally watched variables
-            # interrupt_active = False
-            # interrupt_code = None
-            # current_result = None
+        while (current_state != "NEXT"):
+
             ret, frame = cap.read()
             if not ret:
                 break
+
+            interrupt_active = False
+            interrupt_code = None
+            current_result = None
             
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = model(rgb_frame)
@@ -403,29 +391,19 @@ def run_ml_model(model_type):
             extra_results = {}
             for key in extra_models:
                 extra_results[key] = extra_models[key](rgb_frame)
+
+            if((current_step != step_index)): # if moved on, move on
+                print("Moved On!")
+                break
             
             for det in results.xyxy[0]:
-
-                if((current_step != step_index)):
-                    break
-                if((run_diagnostic()) and (previous_state != "NEXT" and (next_counter == 0))):
-                    current_state = "NEXT"
-
+                print(f"Current Model: {model_type}")
 
                 x1, y1, x2, y2, conf, cls = det
                 label = f"{results.names[int(cls)]} {conf:.2f}"
                 class_name = label.split(" ")[0]
+                print(f"{class_name}\n")
                 confidence = float(label.split(" ")[1])
-                
-                if model_type == 'knife_safety':
-                    if class_name == "unsafe" and confidence > 0.2:
-                        frame_count += 1
-                    else:
-                        frame_count = 0
-                    if frame_count > 5:
-                        interrupt_active = True
-                        interrupt_code = 2
-                        print("WARNING: unsafe knife handling")
                 
                 if model_type == 'onion_cut':
                     if class_name == previous_class and confidence > 0.15:
@@ -451,28 +429,46 @@ def run_ml_model(model_type):
                 
                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
                 cv2.putText(frame, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            if(current_result == desired_result):
+                send_next = True
+                time.sleep(0.5)
+                break
             
             for key in extra_results:
                 for det in extra_results[key].xyxy[0]:
                     x1, y1, x2, y2, conf, cls = det
                     label = f"{extra_results[key].names[int(cls)]} {conf:.2f}"
                     class_name = label.split(" ")[0]
+
                     if class_name == "fire":
-                        interrupt_active = True
-                        interrupt_code = 1
-                        print("WARNING: fire!")
+                        if(current_state != "INTERRPUT" and current_state != "PAUSED"):
+                            interrupt_active = True
+                            interrupt_code = 1
+                            print("WARNING: fire!")
 
                     if class_name == "lacerations" or class_name == "bloodstains":
-                        interrupt_active = True
-                        interrupt_code = 3
-                        print("WARNING: injury!")
+                        if(current_state != "INTERRPUT" and current_state != "PAUSED"):
+                            interrupt_active = True
+                            interrupt_code = 3
+                            print("WARNING: injury!")
+                    
+                    if class_name == "unsafe":
+                        frame_count += 1
+                    else:
+                        frame_count = 0
+                    if frame_count > 5:
+                        if(current_state != "INTERRPUT" and current_state != "PAUSED"):
+                            interrupt_active = True
+                            interrupt_code = 2
+                            print("WARNING: unsafe knife handling")
+            
                     cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
                     cv2.putText(frame, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            
-            cv2.imshow('Ingredient & Safety Detection', frame)
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-    
+        
     except KeyboardInterrupt:
         print("\nChange ML model type")
     
@@ -482,9 +478,13 @@ def run_ml_model(model_type):
 # return function
 def run_diagnostic():
 
-    global current_result, desired_result
+    global current_result, desired_result, send_next
 
-    return (current_result == desired_result)
+    with lock:
+        print(f"desired: {desired_result}")
+        print(current_result)
+
+    return 
             
 # main
 if __name__ == "__main__":
