@@ -1,11 +1,10 @@
 import threading
 import time
-import websocket  # Install with: pip install websocket-client
+import websocket #As opposed to websockets, which was used in the rpi side
 
 # Server address
 SERVER_URI = "ws://localhost:8765"
 
-# Headers to match the ones in your server
 HEADERS = {
     "ACK": "1",
     "SYN": "10",
@@ -61,9 +60,13 @@ def receive_messages(ws):
             if header == HEADERS["INTR"]:
                 print(f"Interrupt Received: {DANGER_CODES.get(int(payload), 'UNKNOWN')}! Take action.")
                 interrupt_code = int(payload)
+                msg = format_message(HEADERS["ACK"], HEADERS["INTR"])
+                ws.send(msg)
             elif header == HEADERS["NEXT"]:
                 print(f"Machine initiated next to step: {payload}. Reported Result: {sequence}.")
                 step_index = int(payload)
+                msg = format_message(HEADERS["ACK"], HEADERS["NEXT"])
+                ws.send(msg)
             else:
                 print(f"Received: {message}")
 
@@ -115,18 +118,15 @@ def send_messages(ws):
 
 # Main function to start the WebSocket client
 def websocket_client():
-    ws = websocket.WebSocket()  # Create WebSocket object
-    ws.connect(SERVER_URI)      # Connect to WebSocket server
+    ws = websocket.WebSocket()
+    ws.connect(SERVER_URI)
 
     print("[CLIENT] Connected to WebSocket server.")
 
-    # Start receiving messages in a separate thread
     receive_thread = threading.Thread(target=receive_messages, args=(ws,))
-    receive_thread.daemon = True  # Closes when main program exits
+    receive_thread.daemon = True
     receive_thread.start()
 
-    # Handle user input and sending messages
     send_messages(ws)
 
-# Run the WebSocket client
 websocket_client()
