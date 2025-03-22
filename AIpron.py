@@ -349,7 +349,7 @@ def run_ml_model(model_type):
     # conf_required = 0.08
     path = model_type + '.pt'
     model = torch.hub.load('yolov5', 'custom', path=path, source='local', verbose=False)
-    model.conf = 0.4
+    model.conf = 0.5 # FOR ONION CUT AND ONION COOK
     model.eval()
     
     extra_models = {}
@@ -361,7 +361,12 @@ def run_ml_model(model_type):
         extra_models["knife_safety"] = torch.hub.load('yolov5', 'custom', path="knife_safety.pt", source='local', verbose=False)
     
     for key in extra_models:
-        extra_models[key].conf = 0.60
+        if key == "fire":
+            extra_models[key].conf = 0.9   # increased fire conf
+        elif key == "knife_safety":
+            extra_models[key].conf = 0.4   # lowered knife safety conf
+        else:
+            extra_models[key].conf = 0.6
         extra_models[key].eval()
 
     cap = cv2.VideoCapture(0)
@@ -457,7 +462,7 @@ def run_ml_model(model_type):
                         frame_count += 1
                     else:
                         frame_count = 0
-                    if frame_count > 5:
+                    if frame_count > 2: # DECREASED FRAME FOR KNIFE SAFETY
                         if(current_state != "INTERRPUT" and current_state != "PAUSED"):
                             interrupt_active = True
                             interrupt_code = 2
