@@ -15,15 +15,19 @@ def run_ml_model(model_type):
     '''
     # conf_required = 0.08
     path = model_type + '.pt'
+    print(f"Loading {model_type} model")
     model = torch.hub.load('yolov5', 'custom', path=path, source='local', verbose=False)
     model.conf = 0.4
     model.eval()
     
     extra_models = {}
     if model_type == "onion_cook":
+        print("Loading Fire Model\n")
         extra_models["fire"] = torch.hub.load('yolov5', 'custom', path="fire.pt", source='local', verbose=False)
     elif model_type == "knife_safety":
+        print("Loading Blood Model\n")
         extra_models["bloodstain"] = torch.hub.load('yolov5', 'custom', path="bloodstain.pt", source='local', verbose=False)
+        print("Loading Cut Model\n")
         extra_models["lacerations"] = torch.hub.load('yolov5', 'custom', path="lacerations.pt", source='local', verbose=False)
     
     for key in extra_models:
@@ -143,7 +147,7 @@ def keyword_checker(sentence: str):
     
     return 0  # Return 0 if no keyword is found
 
-
+'''
 
 # yahya's variable: global variable user_input
 user_input = None
@@ -184,10 +188,10 @@ if result == "blonde" or result == "golden" or result == "caramelized": # onion 
             if user_input == "yes":
                 break
             
-
-
-
 '''
+
+
+
 previous_param = None
 while True:
     user_input = input("Enter model type: ")
@@ -197,4 +201,3 @@ while True:
         previous_param = user_input
     else:
         print("Parameter is the same as the previous one. No action taken.")
-'''
