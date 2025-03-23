@@ -8,7 +8,7 @@ import warnings
 import copy
 import pathlib
 
-# pathlib.WindowsPath = pathlib.PosixPath
+pathlib.WindowsPath = pathlib.PosixPath
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -71,7 +71,7 @@ def parse_message(message):
     elif len(parts) > 1:
         payload = parts[1]
         sequence = ""
-    return header, payload, sequence
+    return header, sequence, payload
 
 # function to handle received messages (incoming)
 async def process_incoming(websocket):
@@ -82,7 +82,7 @@ async def process_incoming(websocket):
             print(message)
             print(current_state)
                 
-            header, payload, sequence = parse_message(message)
+            header, sequence, payload = parse_message(message)
 
             if current_state == "IDLE" and header == HEADERS["SYN"]:
                 print("Client initiating data transfer.")
@@ -123,14 +123,14 @@ async def process_incoming(websocket):
                 desired_result = ""
                 current_state = "IDLE"
                 instruction_payload = ""
-                await websocket.send(format_message(HEADERS["ACK"], HEADERS["RESET"]))
+                await websocket.send(format_message(HEADERS["ACK"], HEADERS["RST"]))
 
             elif header == HEADERS["HEARTBEAT"]:
                 print("Heartbeat received.")
                 await websocket.send(format_chopped_message(HEADERS["ACK"], current_state, HEADERS["HEARTBEAT"]))
 
             elif header == HEADERS["NEXT"]:
-                await websocket.send(format_message(HEADERS["ACK"], HEADERS["NEXT"]))
+                await websocket.send(format_chopped_message(HEADERS["ACK"], current_result, HEADERS["NEXT"]))
                 step_index = int(payload)
                 print(f"User-Initiated Next, moving to step: {step_index}")
                 previous_state = current_state
@@ -160,14 +160,14 @@ async def process_incoming(websocket):
                 current_state = "IDLE"
 
 # asyncio coroutine necessity
-async def set_send():
+def set_send():
     send_event.set()
 
 # process sending data
 async def process_sending(websocket):
     global current_state, received_payload, instruction_payload, previous_state, interrupt_code, interrupt_active, ldata_to_send, current_result, desired_result, step_index
 
-    while 1:
+    while True:
         await send_event.wait()
         send_event.clear()
         try:
@@ -250,8 +250,9 @@ async def send_data(websocket):
     current_state = "IDLE"
 
 # separate thread function to discern send conditions
-def send_cases(loop):
+def send_cases():
     global current_state, received_payload, instruction_payload, previous_state, interrupt_code, interrupt_active, ldata_to_send, send_next
+    # loop = asyncio.get_running_loop()
 
     while True:
         if (interrupt_active):
@@ -259,20 +260,23 @@ def send_cases(loop):
             current_state = "INTERRUPT"
             interrupt_active = False
             print("Interrupt Active!")
-            asyncio.run_coroutine_threadsafe(set_send(), loop)
+            set_send()
+            # asyncio.run_coroutine_threadsafe(set_send(), loop)
 
 
         elif (ldata_to_send):
             instruction_payload = "Quando autem elevatum est cor eius, et spiritus illius obfirmatus est ad superbiam, depositus est de solio regni sui, et gloria eius ablata est et a filiis hominum eiectus est, sed et cor eius cum bestiis positum est, et cum onagris erat habitatio eius: foenum quoque ut bos comedebat, et rore caeli corpus eius infectum est, donec cognosceret quod potestatem haberet Altissimus in regno hominum: et quemcumque voluerit, suscitabit super illud."  # Data to be sent to central
             current_state = "SENDING"
             ldata_to_send = False
-            asyncio.run_coroutine_threadsafe(set_send(), loop)
+            set_send()
+            # asyncio.run_coroutine_threadsafe(set_send(), loop)
 
 
         elif (send_next):
             current_state = "NEXT"
             send_next = False
-            asyncio.run_coroutine_threadsafe(set_send(), loop)
+            set_send()
+            # asyncio.run_coroutine_threadsafe(set_send(), loop)
         
         else:
             pass
@@ -304,8 +308,8 @@ async def start_server():
         print("Server Running!")
 
         # Start send_cases in a separate thread
-        loop = asyncio.get_event_loop()
-        cases_thread = threading.Thread(target=send_cases, args=(loop,), daemon=True)
+        # loop = asyncio.get_event_loop()
+        cases_thread = threading.Thread(target=send_cases, args=(), daemon=True)
         ML_thread = threading.Thread(target=ML_func, args=(), daemon=True)
         cases_thread.start()
         ML_thread.start()
@@ -317,19 +321,20 @@ def ML_func():
 
     global step_index, desired_result, current_result, current_state, recipe_ready, received_payload
 
-    while (current_state != "NEXT"):
-        if((recipe_ready) and (received_payload != [])):
-            desired_result = keyword_checker(received_payload[int(step_index)])
+    while 1:
+        if (current_state != "NEXT"):
+            if((recipe_ready) and (received_payload != [])):
+                desired_result = keyword_checker(received_payload[int(step_index)])
 
-            if desired_result == "finely_dice" or desired_result == "roughly_slice" or desired_result == "slice": # onion cutting instruction
-                print("Checking onion cut...")
-                model_type = "onion_cut"
-                run_ml_model(model_type)
-            elif desired_result == "":
-                pass
-            else:
-                model_type = "onion_cook"
-                run_ml_model(model_type)
+                if desired_result == "finely_dice" or desired_result == "roughly_slice" or desired_result == "slice": # onion cutting instruction
+                    print("Checking onion cut...")
+                    model_type = "onion_cut"
+                    run_ml_model(model_type)
+                elif desired_result == "":
+                    pass
+                else:
+                    model_type = "onion_cook"
+                    run_ml_model(model_type)
 
 def run_ml_model(model_type):
     '''
@@ -341,7 +346,7 @@ def run_ml_model(model_type):
     }
     '''
 
-    global current_result, interrupt_active, interrupt_code, step_index, current_state, previous_state, send_next, received_payload
+    global current_result, interrupt_active, interrupt_code, step_index, current_state, previous_state, send_next, received_payload, desired_result
 
     print(f"Step Index: {int(step_index)}")
     print(f"Current Step: {received_payload[int(step_index)]}")
@@ -376,19 +381,21 @@ def run_ml_model(model_type):
 
     frame_count = 0
     previous_class = None
-
-    current_step = copy.deepcopy(step_index)
+    current_result = None
+    interrupt_code = None
     
     try:
         while (current_state != "NEXT"):
+            
+            # print(step_index)
+            # print(current_step)
+            current_step = copy.deepcopy(step_index)
 
             ret, frame = cap.read()
             if not ret:
                 break
 
             interrupt_active = False
-            interrupt_code = None
-            current_result = None
             
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = model(rgb_frame)
@@ -403,6 +410,9 @@ def run_ml_model(model_type):
             
             for det in results.xyxy[0]:
                 print(f"Current Model: {model_type}")
+                if((current_step != step_index)): # if moved on, move on
+                    print("Moved On!")
+                    break
 
                 x1, y1, x2, y2, conf, cls = det
                 label = f"{results.names[int(cls)]} {conf:.2f}"
@@ -435,7 +445,7 @@ def run_ml_model(model_type):
                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
                 cv2.putText(frame, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            if(current_result == desired_result):
+            if(current_result == desired_result) and (model_type != "onion_cut"):
                 send_next = True
                 time.sleep(0.5)
                 break
@@ -448,14 +458,14 @@ def run_ml_model(model_type):
 
                     if class_name == "fire":
                         if(current_state != "INTERRPUT" and current_state != "PAUSED"):
-                            interrupt_active = True
                             interrupt_code = 1
+                            interrupt_active = True
                             print("WARNING: fire!")
 
                     if class_name == "lacerations" or class_name == "bloodstains":
                         if(current_state != "INTERRPUT" and current_state != "PAUSED"):
-                            interrupt_active = True
                             interrupt_code = 3
+                            interrupt_active = True
                             print("WARNING: injury!")
                     
                     if class_name == "unsafe":
@@ -464,8 +474,8 @@ def run_ml_model(model_type):
                         frame_count = 0
                     if frame_count > 2: # DECREASED FRAME FOR KNIFE SAFETY
                         if(current_state != "INTERRPUT" and current_state != "PAUSED"):
-                            interrupt_active = True
                             interrupt_code = 2
+                            interrupt_active = True
                             print("WARNING: unsafe knife handling")
             
                     cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
