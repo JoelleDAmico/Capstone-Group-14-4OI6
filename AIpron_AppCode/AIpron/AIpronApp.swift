@@ -11,7 +11,9 @@ import SwiftUI
 struct AIpronApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SignInView()
+                .environmentObject(Network())
+            
         }
     }
 }

@@ -8,28 +8,40 @@
 import SwiftUI
 
 // dynamic list view 
-struct OldRecipeView: View {
-    var a = 0
-    var individualRecipe: [RecipeDataView] = RecipeList.topTen
+struct RecipeDatabaseView: View {
+     
+    @State var individualRecipe: [RecipeData] = RecipeList.topTen
     
     var body: some View{
         NavigationView{
             List(individualRecipe,id: \.id){Recipe in
                 
                 NavigationLink(
-                    destination: RecipeDetailView(recipe: Recipe),
+                    destination: DetailedRecipeView(recipe: Recipe),
                     label: {
                        RecipeCellView(individualRecipe: Recipe)
                         }
                     )
             }
-                .navigationTitle(Text("Recipe List"))
+            .navigationTitle(Text("Recipe List"))
             .navigationBarTitleDisplayMode(.automatic)
+            .toolbar(content: {
+                ToolbarItem(placement: .navigationBarTrailing){
+    
+                    Button("Refresh"){
+                        
+                        individualRecipe = RecipeList.topTen
+                        
+                    }
+                }
+            })
+            
            
             
             
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        
     }
 
 }
@@ -37,7 +49,7 @@ struct OldRecipeView: View {
 
 struct RecipeCellView: View{
     
-    var individualRecipe: RecipeDataView
+    var individualRecipe: RecipeData
     var body: some View{
         HStack{
             Image(individualRecipe.imageName)
@@ -75,7 +87,7 @@ struct RecipeCellView: View{
 
 struct RecipeDetailView_Previews: PreviewProvider{
     static var previews: some View{
-        OldRecipeView()
+        RecipeDatabaseView()
     }
 }
 

@@ -8,7 +8,7 @@
 import SwiftUI
 
 // Sign in Page for the App
-struct ContentView: View {
+struct SignInView: View {
     
     @State var ready = false
     
@@ -16,9 +16,15 @@ struct ContentView: View {
         
         // ready false when not signed it
         if ready == false{
-            Button("Sign In"){
+            Button("Sign In with Apple "){
                 self.ready = true
             }
+            .font(.title2)
+            .frame(width: 240, height: 40)
+            .background(Color(.black))
+            .foregroundColor(.white)
+            .cornerRadius(/*@START_MENU_TOKEN@*/3.0/*@END_MENU_TOKEN@*/)
+             .padding(.top,10)
         }
         //button clicked,ready set to true, move to main menu page
         else{
@@ -34,11 +40,11 @@ struct MainMenuView: View {
     var body: some View {
         TabView(){
             //shows view for recipe list
-            OldRecipeView()
+            AddNewRecipeView()
                 .tabItem {
                     //design or edit tab view
-                    Image(systemName: "house")
-                    Text("Old Recipies")
+                    Image(systemName: "car")
+                    Text("New Recipe")
                 }
                 
             //shows view for safety tips
@@ -49,20 +55,21 @@ struct MainMenuView: View {
                     Text("Menu")
                 }
             //shows view for adding a new recipe
-            NewRecipe()
-                .tabItem {
-                    //design or edit tab view
-                    Image(systemName: "car")
-                    Text("New Recipe")
-                }
+            
+            RecipeDatabaseView()
+            .tabItem {
+                //design or edit tab view
+                Image(systemName: "house")
+                Text("Old Recipies")
+            }
         }
        
     }
     
 }
 
-struct ContentView_Previews: PreviewProvider {
+struct SignInView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView()
+        SignInView()
     }
 }

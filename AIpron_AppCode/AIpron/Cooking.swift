@@ -9,7 +9,7 @@ import SwiftUI
 
 struct RunRecipe: View {
     
-    var individualRecipe: RecipeDataView
+    var individualRecipe: RecipeData
     
     var body: some View{
         

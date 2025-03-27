@@ -7,9 +7,9 @@
 
 import SwiftUI
 
-struct RecipeDetailView: View {
+struct DetailedRecipeView: View {
     
-    var recipe: RecipeDataView
+    var recipe: RecipeData
     
     var body: some View{
         
@@ -102,6 +102,6 @@ struct RecipeDetailView: View {
 
 struct RecipeSDetailView_Previews: PreviewProvider{
     static var previews: some View{
-        RecipeDetailView(recipe: RecipeList.topTen.first!)
+        DetailedRecipeView(recipe: RecipeList.topTen.first!)
     }
 }
