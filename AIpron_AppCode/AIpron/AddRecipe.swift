@@ -109,14 +109,21 @@ struct AddedRecipeView: View {
             .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:10)
             
             HStack{
-                List(network.user.ingredients.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).components(separatedBy: ","), id: \.self){ingredient in
+                List(network.user.ingredients.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                    .trimmingCharacters(in:
+                    CharacterSet(charactersIn: "''"))
+                    .components(separatedBy: "', '"), id: \.self){ingredient in
                     
                     Text("\(ingredient)")
                         .font(.footnote)
                         .padding(10)
                 }
                 
-                List(network.user.instructions.components(separatedBy: "\\n"), id: \.self){instruction in
+                List(network.user.instructions.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                    .trimmingCharacters(in:
+                    CharacterSet(charactersIn: "''"))
+
+                    .components(separatedBy: "', '"), id: \.self){instruction in
                     
                     Text("\(instruction)")
                         .font(.footnote)
@@ -159,15 +166,21 @@ struct AddedRecipeView: View {
     }
     func buttonClicked(){
         
-        RecipeList.topTen.append(RecipeData(imageName: network.user.imageName,
-                                            title: network.user.title,
-                                            recipe: network.user.recipe,
-                                            TotalRecipeTime: network.user.TotalRecipeTime,
-                                            chef: network.user.chef,
-                                            ingredients: network.user.ingredients.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).components(separatedBy: ","),
-                                            instructions: network.user.instructions.components(separatedBy: "\\n"),
-                                            yield: network.user.recipeYield,
-                                            url: URL(string:network.user.url)!))
+        RecipeList.topTen.append(RecipeData(
+                    imageName: network.user.imageName,
+                    title: network.user.title,
+                    recipe: network.user.recipe,
+                    TotalRecipeTime: network.user.TotalRecipeTime,
+                    chef: network.user.chef,
+                    ingredients:network.user.ingredients.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "''"))
+                        .components(separatedBy: "', '"),
+                    instructions:network.user.instructions.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                        .trimmingCharacters(in:
+                        CharacterSet(charactersIn: "''"))
+                        .components(separatedBy: "', '"),
+                    yield: network.user.recipeYield,
+                    url: URL(string:network.user.url)!))
         
         
         
@@ -187,7 +200,7 @@ class Network: ObservableObject {
     
     func getUsers(input_url: String) {
      
-        guard let url = URL(string: "https://g0pifns1z5.execute-api.us-east-2.amazonaws.com/hopefully_valid_json/links?link_input=" + input_url) else { fatalError("Missing URL") }
+        guard let url = URL(string: "https://g0pifns1z5.execute-api.us-east-2.amazonaws.com/instr_ios_v3/links?link_input=" + input_url) else { fatalError("Missing URL") }
         
         let urlRequest = URLRequest(url: url)
         
