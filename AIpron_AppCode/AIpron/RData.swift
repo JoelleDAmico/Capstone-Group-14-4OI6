@@ -45,6 +45,24 @@ struct RecipeList {
     
     static var topTen = [
         RecipeData(imageName: "appstore",
+              title: "Onion Cutting",
+              recipe: "In this video I discuss 9 things I wish I knew before I started programming. Knowing these things would have made my journey in becoming a full-time iOS developer so much faster and easier. I hope this advice helps someone out there that's early in their career as a software developer.",
+              TotalRecipeTime: "5",
+              chef: "Team AiPRON",
+              ingredients: [
+                "Onions"
+            ],
+              instructions: [
+                "roughly chop onion",
+                "slice onion",
+                "caramelize onion",
+                "All Done!"
+              ],
+              yield: "1 Servings",
+              url: URL(string: "https://www.youtube.com/watch?v=gs8qfL9PNac")!),
+        
+            
+        RecipeData(imageName: "appstore",
               title: "Pasta Bolegnese with Gluton free Spagetti",
               recipe: "In this video I discuss 9 things I wish I knew before I started programming. Knowing these things would have made my journey in becoming a full-time iOS developer so much faster and easier. I hope this advice helps someone out there that's early in their career as a software developer.",
               TotalRecipeTime: "5",

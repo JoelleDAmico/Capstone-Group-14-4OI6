@@ -17,6 +17,7 @@
 		7962ECF82D30CB890096983A /* DetailedRecipeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7962ECF72D30CB890096983A /* DetailedRecipeView.swift */; };
 		7962ECFC2D320CD60096983A /* Cooking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7962ECFB2D320CD50096983A /* Cooking.swift */; };
 		79993F302D94A3FC00EA9F0A /* CoreData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 79993F2F2D94A3FC00EA9F0A /* CoreData.framework */; };
+		79F8EA4E2D99962A001119BC /* webSocketHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F8EA4D2D99962A001119BC /* webSocketHandler.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		7962ECF72D30CB890096983A /* DetailedRecipeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailedRecipeView.swift; sourceTree = "<group>"; };
 		7962ECFB2D320CD50096983A /* Cooking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cooking.swift; sourceTree = "<group>"; };
 		79993F2F2D94A3FC00EA9F0A /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
+		79F8EA4D2D99962A001119BC /* webSocketHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = webSocketHandler.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +75,7 @@
 				7962ECF72D30CB890096983A /* DetailedRecipeView.swift */,
 				7962ECFB2D320CD50096983A /* Cooking.swift */,
 				7962ECF52D30CA290096983A /* RData.swift */,
+				79F8EA4D2D99962A001119BC /* webSocketHandler.swift */,
 				7962ECDB2D2EF9F30096983A /* Assets.xcassets */,
 				7962ECE02D2EF9F30096983A /* Info.plist */,
 				7962ECDD2D2EF9F30096983A /* Preview Content */,
@@ -171,6 +174,7 @@
 				7962ECF42D30C9B70096983A /* RecipeDatabase.swift in Sources */,
 				7962ECE72D2EFAE00096983A /* AddRecipe.swift in Sources */,
 				7962ECFC2D320CD60096983A /* Cooking.swift in Sources */,
+				79F8EA4E2D99962A001119BC /* webSocketHandler.swift in Sources */,
 				7962ECD82D2EF9EF0096983A /* AIpronApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

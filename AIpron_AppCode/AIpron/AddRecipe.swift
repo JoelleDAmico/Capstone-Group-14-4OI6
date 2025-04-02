@@ -12,6 +12,8 @@ import AuthenticationServices
 
 struct AddNewRecipeView: View {
     
+    @State private var check_link = false
+    @State private var show_alert = false
     @EnvironmentObject var network: Network
     
     @State private var recipeUrl = "https://www.allrecipes.com/recipe/158968/spinach-and-feta-turkey-burgers/"
@@ -35,17 +37,39 @@ struct AddNewRecipeView: View {
                     
                     NavigationLink(
                         destination: AddedRecipeView(recipe_url: "\(recipeUrl)"),
-                       label: {
-                           Text("View Recipe")
-                               .bold()
-                       })
-                       .font(.title2)
-                       .frame(width: 240, height: 40)
-                       .background(Color(.systemRed))
-                       .foregroundColor(.white)
-                       .cornerRadius(/*@START_MENU_TOKEN@*/3.0/*@END_MENU_TOKEN@*/)
-                        .padding(.top,10)
+                        isActive: $check_link
+                        ) {
+                          EmptyView()
+                       }
+                    Button("Go to Next Page") {
+                        print(recipeUrl.components(separatedBy: " "))
+                        print(recipeUrl.components(separatedBy: " ").count)
+                        
+                        if recipeUrl.components(separatedBy: " ").count == 1 && UIApplication.shared.canOpenURL(URL(string: recipeUrl)!){
+                            check_link = true
+                            show_alert = false// Only navigate if condition is met
+                       } else {
+                            check_link = false
+                            show_alert = true
+                            print("Value is not valid!")  // Debugging message
+                       }
+                    }
+                   .font(.title2)
+                   .frame(width: 240, height: 40)
+                   .background(Color(.systemRed))
+                   .foregroundColor(.white)
+                   .cornerRadius(/*@START_MENU_TOKEN@*/3.0/*@END_MENU_TOKEN@*/)
+                   .padding(.top,10)
                 
+                
+            }
+            .alert(isPresented: $show_alert) {
+                Alert(title: Text("AIpron Talks"),
+                      message: Text("Invalid URL!!!"),
+                      dismissButton: .default(Text("OK")){
+                        show_alert = false
+                        
+                      })
             }
         }
     }
@@ -133,7 +157,7 @@ struct AddedRecipeView: View {
             }
             .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:0)
             
-            Link(destination: URL(string: "https://www.youtube.com/watch?v=gs8qfL9PNac")!, label: {
+            Link(destination: URL(string: recipe_url)!, label: {
                 Text("Visit Site")
                     .bold()
                     .font(.title2)
@@ -180,7 +204,7 @@ struct AddedRecipeView: View {
                         CharacterSet(charactersIn: "''"))
                         .components(separatedBy: "', '"),
                     yield: network.user.recipeYield,
-                    url: URL(string:network.user.url)!))
+                    url: URL(string: recipe_url)!))
         
         
         

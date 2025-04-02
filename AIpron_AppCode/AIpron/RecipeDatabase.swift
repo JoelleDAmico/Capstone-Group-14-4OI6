@@ -9,7 +9,7 @@ import SwiftUI
 
 // dynamic list view 
 struct RecipeDatabaseView: View {
-     
+    
     @State var individualRecipe: [RecipeData] = RecipeList.topTen
     
     var body: some View{
