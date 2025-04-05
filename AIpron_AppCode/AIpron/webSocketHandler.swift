@@ -17,7 +17,7 @@ class WebSocketManager: ObservableObject {
     
     private var webSocketTask: URLSessionWebSocketTask?
 //    private let serverURL =  "ws://localhost:8765"
-    private let serverIP = "172.17.196.244"
+    private let serverIP = "172.17.54.207"
     private let port = "8765"
     
     private var cancellables = Set<AnyCancellable>()

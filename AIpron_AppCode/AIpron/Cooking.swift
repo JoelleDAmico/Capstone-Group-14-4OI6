@@ -42,11 +42,11 @@ struct RunRecipe: View {
                     
                     Text("\(individualRecipe.instructions[instruction])")
                         .padding(20)
+                        .font(.custom("Times New Roman", size: 40))
+                        .foregroundColor(Color.white)
                     
                     .tag(instruction)
                 }
-                
-                Text("Yippee, Food Time")
                 .tag(individualRecipe.instructions.count)
                 
             }
@@ -65,9 +65,13 @@ struct RunRecipe: View {
                    .foregroundColor(.white)
                    .cornerRadius(8)
             }
+            .padding(.leading,20)
+            .padding(.bottom,20)
             .disabled(selectedPage == 0) // Disable when at the first page
+//            .frame(width: 240, height: 40)
            
             Spacer()
+                
            // Next Button
            Button(action: {
                if selectedPage < individualRecipe.instructions.count {
@@ -81,15 +85,16 @@ struct RunRecipe: View {
                    .foregroundColor(.white)
                    .cornerRadius(8)
            }
+           .padding(.trailing,20)
+           .padding(.bottom,20)
+//           .frame(width: 240, height: 40)
            .disabled(selectedPage == individualRecipe.instructions.count)
         }
             
-          //  timerView()
             
         }
-        .background(Image("bg1")
-                        .resizable()
-                        .edgesIgnoringSafeArea(/*@START_MENU_TOKEN@*/.all/*@END_MENU_TOKEN@*/))
+
+        .background(Color(red: 78/255, green: 11/255, blue: 10/255 ))
         .navigationBarItems(trailing: Button(action: {
             print("Custom Button Tapped")
             selectedPage = 0

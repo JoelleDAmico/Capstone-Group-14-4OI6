@@ -12,7 +12,7 @@ struct DetailedRecipeView: View {
     var recipe: RecipeData
     
     var body: some View{
-        
+
             VStack(spacing:10){
                 
                 Text(recipe.title)
@@ -21,7 +21,7 @@ struct DetailedRecipeView: View {
                     .lineLimit(/*@START_MENU_TOKEN@*/2/*@END_MENU_TOKEN@*/)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal,4)
-                    .offset(x: 0, y: -50)
+//                    .offset(x: 0, y: -50)
                 
                 Image(recipe.imageName)
                     .resizable()
@@ -29,7 +29,7 @@ struct DetailedRecipeView: View {
                     .frame(height: 150)
                     .cornerRadius(12)
                     .foregroundColor(.secondary)
-                    .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:-40)
+                    .padding(.top,10)
                 
                 HStack(spacing: 100){
                     Label(recipe.yield,systemImage: "eyes")
@@ -41,7 +41,7 @@ struct DetailedRecipeView: View {
                         .padding(.trailing,20)
                     
                 }
-                .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:-30)
+//                .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:-30)
                 
                 HStack(spacing: 100){
                     Text("Ingredients")
@@ -51,7 +51,7 @@ struct DetailedRecipeView: View {
                         .font(.title3)
                         .padding(.trailing,20)
                 }
-                .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:-20)
+//                .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:-20)
                 
                 HStack{
                     List(recipe.ingredients, id: \.self){ingredient in
@@ -68,7 +68,7 @@ struct DetailedRecipeView: View {
                             .padding(10)
                     }
                 }
-                .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:-30)
+//                .offset(x: /*@START_MENU_TOKEN@*/10.0/*@END_MENU_TOKEN@*/, y:-30)
                 
                 Link(destination: recipe.url, label: {
                     Text("Visit Site")
@@ -93,8 +93,7 @@ struct DetailedRecipeView: View {
                     .cornerRadius(/*@START_MENU_TOKEN@*/3.0/*@END_MENU_TOKEN@*/)
                     .padding(.bottom,5)
                     
-            }
-
+        }
     }
 }
 
