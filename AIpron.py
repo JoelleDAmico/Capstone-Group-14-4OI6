@@ -7,6 +7,7 @@ import cv2
 import warnings
 import copy
 import pathlib
+from picamera2 import Picamera2
 
 pathlib.WindowsPath = pathlib.PosixPath
 
@@ -25,6 +26,9 @@ step_index = 0
 recipe_ready = False
 current_result = ""
 desired_result = ""
+
+cap = Picamera2()
+cap.configure(cap.create_preview_configuration(main={"format": 'RGB888', "size": (640, 360)}))
 
 
 KEYWORDS = ["BLONDE COOK", "GOLDEN COOK", "CARAMELIZE COOK", "FINELY DICE", "ROUGH CHOP", "SLICE"]
@@ -160,7 +164,7 @@ async def process_incoming(websocket):
                 current_state = "IDLE"
 
 # asyncio coroutine necessity
-def set_send():
+async def set_send():
     send_event.set()
 
 # process sending data
@@ -250,7 +254,7 @@ async def send_data(websocket):
     current_state = "IDLE"
 
 # separate thread function to discern send conditions
-def send_cases():
+def send_cases(loop):
     global current_state, received_payload, instruction_payload, previous_state, interrupt_code, interrupt_active, ldata_to_send, send_next
     # loop = asyncio.get_running_loop()
 
@@ -260,23 +264,23 @@ def send_cases():
             current_state = "INTERRUPT"
             interrupt_active = False
             print("Interrupt Active!")
-            set_send()
-            # asyncio.run_coroutine_threadsafe(set_send(), loop)
+            #set_send()
+            asyncio.run_coroutine_threadsafe(set_send(), loop)
 
 
         elif (ldata_to_send):
             instruction_payload = "Quando autem elevatum est cor eius, et spiritus illius obfirmatus est ad superbiam, depositus est de solio regni sui, et gloria eius ablata est et a filiis hominum eiectus est, sed et cor eius cum bestiis positum est, et cum onagris erat habitatio eius: foenum quoque ut bos comedebat, et rore caeli corpus eius infectum est, donec cognosceret quod potestatem haberet Altissimus in regno hominum: et quemcumque voluerit, suscitabit super illud."  # Data to be sent to central
             current_state = "SENDING"
             ldata_to_send = False
-            set_send()
-            # asyncio.run_coroutine_threadsafe(set_send(), loop)
+            #set_send()
+            asyncio.run_coroutine_threadsafe(set_send(), loop)
 
 
         elif (send_next):
             current_state = "NEXT"
             send_next = False
-            set_send()
-            # asyncio.run_coroutine_threadsafe(set_send(), loop)
+            #set_send()
+            asyncio.run_coroutine_threadsafe(set_send(), loop)
         
         else:
             pass
@@ -304,12 +308,12 @@ def keyword_checker(sentence: str):
 
 # Start WebSocket server
 async def start_server():
-    async with websockets.serve(websocket_handler, "localhost", 8765):
+    async with websockets.serve(websocket_handler, "0.0.0.0", 8765):
         print("Server Running!")
 
         # Start send_cases in a separate thread
-        # loop = asyncio.get_event_loop()
-        cases_thread = threading.Thread(target=send_cases, args=(), daemon=True)
+        loop = asyncio.get_event_loop()
+        cases_thread = threading.Thread(target=send_cases, args=(loop,), daemon=True)
         ML_thread = threading.Thread(target=ML_func, args=(), daemon=True)
         cases_thread.start()
         ML_thread.start()
@@ -346,7 +350,7 @@ def run_ml_model(model_type):
     }
     '''
 
-    global current_result, interrupt_active, interrupt_code, step_index, current_state, previous_state, send_next, received_payload, desired_result
+    global current_result, interrupt_active, interrupt_code, step_index, current_state, previous_state, send_next, received_payload, desired_result, cap
 
     print(f"Step Index: {int(step_index)}")
     print(f"Current Step: {received_payload[int(step_index)]}")
@@ -367,17 +371,19 @@ def run_ml_model(model_type):
     
     for key in extra_models:
         if key == "fire":
-            extra_models[key].conf = 0.9   # increased fire conf
+            extra_models[key].conf = 0.5   # increased fire conf
         elif key == "knife_safety":
             extra_models[key].conf = 0.4   # lowered knife safety conf
         else:
-            extra_models[key].conf = 0.6
+            extra_models[key].conf = 0.2
         extra_models[key].eval()
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Error: Could not open video stream.")
-        exit()
+    # cap = cv2.VideoCapture(0)
+
+    cap.start()
+    # if not cap.isOpened():
+        # print("Error: Could not open video stream.")
+        # exit()
 
     frame_count = 0
     previous_class = None
@@ -387,15 +393,18 @@ def run_ml_model(model_type):
     try:
         while (current_state != "NEXT"):
             
-            # print(step_index)
             # print(current_step)
             current_step = copy.deepcopy(step_index)
 
-            ret, frame = cap.read()
-            if not ret:
-                break
+            #ret, frame = cap.read()
+            #if not ret:
+                #break
+            
+
+            frame = cap.capture_array()
 
             interrupt_active = False
+
             
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = model(rgb_frame)
@@ -407,6 +416,8 @@ def run_ml_model(model_type):
             if((current_step != step_index)): # if moved on, move on
                 print("Moved On!")
                 break
+                
+
             
             for det in results.xyxy[0]:
                 print(f"Current Model: {model_type}")
@@ -426,7 +437,7 @@ def run_ml_model(model_type):
                     else:
                         frame_count = 0
                     previous_class = class_name
-                    if frame_count > 5:
+                    if frame_count >= 1:
                         current_result = class_name
                         print(f"Onion cut type: {class_name}")
                         break
@@ -437,7 +448,7 @@ def run_ml_model(model_type):
                     else:
                         frame_count = 0
                     previous_class = class_name
-                    if frame_count > 5:
+                    if frame_count >= 1:
                         current_result = class_name
                         print(f"Onion cook type: {class_name}")
                         break
@@ -457,29 +468,39 @@ def run_ml_model(model_type):
                     class_name = label.split(" ")[0]
 
                     if class_name == "fire":
-                        if(current_state != "INTERRPUT" and current_state != "PAUSED"):
+                        if(current_state != "INTERRUPT" and current_state != "PAUSED"):
                             interrupt_code = 1
                             interrupt_active = True
                             print("WARNING: fire!")
+                            while(True):
+                                if (interrupt_active == False):
+                                    break
+                            break
 
-                    if class_name == "lacerations" or class_name == "bloodstains":
-                        if(current_state != "INTERRPUT" and current_state != "PAUSED"):
+                    if class_name == "Cut" or class_name == "blood stains":
+                        if(current_state != "INTERRUPT" and current_state != "PAUSED"): 
                             interrupt_code = 3
                             interrupt_active = True
                             print("WARNING: injury!")
+                            while(True):
+                                if (interrupt_active == False):
+                                    break
+                            break
                     
                     if class_name == "unsafe":
-                        frame_count += 1
-                    else:
-                        frame_count = 0
-                    if frame_count > 2: # DECREASED FRAME FOR KNIFE SAFETY
-                        if(current_state != "INTERRPUT" and current_state != "PAUSED"):
+                        if(current_state != "INTERRUPT" and current_state != "PAUSED"):
                             interrupt_code = 2
                             interrupt_active = True
                             print("WARNING: unsafe knife handling")
+                            while(True):
+                                if (interrupt_active == False):
+                                    break
+                            break
             
                     cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
                     cv2.putText(frame, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                    #interrupt_active = False
+            
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -487,7 +508,8 @@ def run_ml_model(model_type):
     except KeyboardInterrupt:
         print("\nChange ML model type")
     
-    cap.release()
+    cap.stop()
+    time.sleep(10)
     cv2.destroyAllWindows()
                     
 # return function
